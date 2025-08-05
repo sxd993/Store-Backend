@@ -6,7 +6,7 @@ export async function getCatalog(page, per_page) {
   
   const [productsResult, countResult] = await Promise.all([
     pool.execute(
-      `SELECT id, name, description, price, stock_quantity 
+      `SELECT id, name, price, stock_quantity 
        FROM products 
        WHERE stock_quantity > 0 
        ORDER BY id ASC 
@@ -21,7 +21,6 @@ export async function getCatalog(page, per_page) {
   const products = productsResult[0].map(p => ({
     id: p.id,
     name: p.name,
-    description: p.description,
     price: parseFloat(p.price),
     stock_quantity: p.stock_quantity
   }));
@@ -45,7 +44,7 @@ export async function getCatalog(page, per_page) {
 // Получить товар по ID
 export async function getProductById(id) {
   const [rows] = await pool.execute(
-    `SELECT id, name, description, price, stock_quantity 
+    `SELECT id, name, price, stock_quantity 
      FROM products 
      WHERE id = ? AND stock_quantity > 0`,
     [id]

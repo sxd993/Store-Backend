@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getCatalog, getProductById} from './model.js';
+import { getCatalog, getProductById } from './model.js';
 import { validatePagination, validateId, handleError } from './schema.js';
 
 const router = Router();
@@ -40,30 +40,7 @@ router.get('/catalog/:id', async (req, res) => {
   }
 });
 
-// GET /catalog/:id/availability - Проверка наличия
-router.get('/catalog/:id/availability', async (req, res) => {
-  try {
-    const id = validateId(req.params.id);
-    const quantity = Math.max(1, parseInt(req.query.quantity) || 1);
-    const availability = await checkAvailability(id, quantity);
-    
-    if (!availability) {
-      return res.status(404).json({
-        success: false,
-        message: 'Товар не найден'
-      });
-    }
-    
-    res.json({ success: true, data: availability });
-  } catch (error) {
-    if (error.message === 'Неверный ID товара') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'ID товара должен быть положительным числом' 
-      });
-    }
-    handleError(res, error, 'Ошибка проверки наличия');
-  }
-});
+// УБРАЛИ роут /catalog/:id/availability так как функция checkAvailability не определена
+// Если нужна проверка наличия - используйте GET /catalog/:id, который возвращает stock_quantity
 
 export default router;

@@ -1,0 +1,11 @@
+bcrypt
+pyjwt
+python-dotenv
+requests
+fastapi
+uvicorn
+sqlalchemy
+mysql-connector-python
+pydantic
+greenlet
+cryptography

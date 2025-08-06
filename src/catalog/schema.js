@@ -26,6 +26,13 @@ export function validateId(id) {
   return numId;
 }
 
+function basicSanitize(str) {
+  if (!str) return str;
+  return str.replace(/<script.*?>.*?<\/script>/gi, '')
+           .replace(/javascript:/gi, '')
+           .replace(/on\w+\s*=/gi, '');
+}
+
 // Валидация данных товара для добавления
 export function validateProduct(productData) {
   if (!productData || typeof productData !== 'object') {
@@ -53,7 +60,9 @@ export function validateProduct(productData) {
     color: color ? color.trim() : null,
     memory: memory ? memory.trim() : null,
     image: image ? image.trim() : null,
-    description: description ? description.trim() : null
+    description: description ? description.trim() : null,
+    name: basicSanitize(name.trim()),
+    description: basicSanitize(description.trim())
   };
 }
 

@@ -12,14 +12,16 @@ export async function getCatalog(page, per_page) {
 
     const offset = (validatedPage - 1) * validatedPerPage;
 
+    const safeLimit = Math.max(1, Math.min(50, parseInt(validatedPerPage)));
+    const safeOffset = Math.max(0, parseInt(offset));
+    
     const query = `
       SELECT id, name, price, stock_quantity, color, memory, image, description
       FROM products 
       WHERE stock_quantity > 0 
       ORDER BY id ASC 
-      LIMIT ${validatedPerPage} OFFSET ${offset}
+      LIMIT ${safeLimit} OFFSET ${safeOffset}
     `;
-
     const [items] = await pool.execute(query, [validatedPerPage, offset]);
 
     const [countRows] = await pool.execute(

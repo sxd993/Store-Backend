@@ -12,7 +12,7 @@ export async function getCatalog(page, per_page) {
     const offset = (validatedPage - 1) * validatedPerPage;
 
     const query = 
-        `SELECT id, name, price, stock_quantity 
+        `SELECT id, name, price, stock_quantity, color, memory, image
          FROM products 
          WHERE stock_quantity > 0 
          ORDER BY id ASC 

@@ -42,7 +42,7 @@ export async function getCatalog(page, per_page) {
 // Получить товар по ID
 export async function getProductById(id) {
   const [rows] = await pool.execute(
-    `SELECT id, name, price, stock_quantity 
+    `SELECT id, name, price, stock_quantity, color, memory, image, description
      FROM products 
      WHERE id = ? AND stock_quantity > 0`,
     [id]
@@ -56,5 +56,9 @@ export async function getProductById(id) {
     name: p.name,
     price: parseFloat(p.price),
     stock_quantity: p.stock_quantity,
+    color: p.color,
+    memory: p.memory,
+    image: p.image,
+    description: p.description
   };
 }

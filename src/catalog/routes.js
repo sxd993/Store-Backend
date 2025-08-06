@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getCatalog, getProductById, addProduct } from './model.js';
+import { getCatalog, getProductById, addProduct, updateProduct } from './model.js';
 import { validatePagination, validateId, validateProduct, handleError, ValidationError } from './schema.js';
 
 const router = Router();
@@ -12,6 +12,30 @@ router.get('/catalog', async (req, res) => {
     res.json({ success: true, data: result });
   } catch (error) {
     handleError(res, error, 'Ошибка получения каталога');
+  }
+});
+
+// PUT /catalog/:id - Обновить товар
+router.put('/catalog/:id', async (req, res) => {
+  try {
+    const id = validateId(req.params.id);
+    const validatedData = validateProduct(req.body);
+    const result = await updateProduct(id, validatedData);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Товар не найден'
+      });
+    }
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ 
+        success: false, 
+        message: error.message 
+      });
+    }
+    handleError(res, error, 'Ошибка обновления товара');
   }
 });
 

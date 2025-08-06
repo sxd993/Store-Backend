@@ -5,7 +5,7 @@ export async function getCatalog(page, per_page) {
   try {
     const validatedPage = parseInt(page);
     const validatedPerPage = parseInt(per_page);
-    
+
     if (isNaN(validatedPage) || isNaN(validatedPerPage) || validatedPage < 1 || validatedPerPage < 1) {
       throw new Error('Неверные параметры пагинации');
     }
@@ -13,7 +13,7 @@ export async function getCatalog(page, per_page) {
     const offset = (validatedPage - 1) * validatedPerPage;
 
     const query = `
-      SELECT id, name, price, stock_quantity, color, memory, image
+      SELECT id, name, price, stock_quantity, color, memory, image, description
       FROM products 
       WHERE stock_quantity > 0 
       ORDER BY id ASC 
@@ -25,7 +25,7 @@ export async function getCatalog(page, per_page) {
     const [countRows] = await pool.execute(
       `SELECT COUNT(*) as total FROM products WHERE stock_quantity > 0`
     );
-    
+
     const total = countRows.length ? countRows[0].total : 0;
     const pages = Math.ceil(total / validatedPerPage);
 
@@ -45,6 +45,42 @@ export async function getCatalog(page, per_page) {
     };
   } catch (error) {
     console.error('Ошибка в getCatalog:', error);
+    throw error;
+  }
+}
+export const updateProduct = async (id, productData) => {
+  try {
+    const { name, price, stock_quantity, color, memory, image, description } = productData;
+    const query = `
+      UPDATE products 
+      SET name = ?, price = ?, stock_quantity = ?, color = ?, memory = ?, image = ?, description = ?
+      WHERE id = ?
+    `;
+    const [result] = await pool.execute(query, [
+      name,
+      price,
+      stock_quantity,
+      color,
+      memory,
+      image,
+      description,
+      id
+    ]);
+    if (result.affectedRows === 0) {
+      throw new Error('Товар не найден или не изменен');
+    }
+    return {
+      id,
+      name,
+      price: parseFloat(price),
+      stock_quantity,
+      color,
+      memory,
+      image,
+      description
+    };
+  } catch (error) {
+    console.error('Ошибка в updateProduct:', error);
     throw error;
   }
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getCatalog, getProductById } from './model.js';
-import { validatePagination, validateId, handleError } from './schema.js';
+import { getCatalog, getProductById, addProduct } from './model.js';
+import { validatePagination, validateId, validateProduct, handleError, ValidationError } from './schema.js';
 
 const router = Router();
 
@@ -30,17 +30,31 @@ router.get('/catalog/:id', async (req, res) => {
     
     res.json({ success: true, data: product });
   } catch (error) {
-    if (error.message === 'Неверный ID товара') {
+    if (error instanceof ValidationError) {
       return res.status(400).json({ 
         success: false, 
-        message: 'ID товара должен быть положительным числом' 
+        message: error.message
       });
     }
     handleError(res, error, 'Ошибка получения товара');
   }
 });
 
-// УБРАЛИ роут /catalog/:id/availability так как функция checkAvailability не определена
-// Если нужна проверка наличия - используйте GET /catalog/:id, который возвращает stock_quantity
+// POST /catalog - Добавить товар
+router.post('/catalog', async (req, res) => {
+  try {
+    const validatedData = validateProduct(req.body);
+    const result = await addProduct(validatedData);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ 
+        success: false, 
+        message: error.message
+      });
+    }
+    handleError(res, error, 'Ошибка добавления товара');
+  }
+});
 
 export default router;

@@ -21,8 +21,9 @@ export function validateRegister(userData) {
     throw new ValidationError('Неверный формат email');
   }
   
-  if (!password || typeof password !== 'string' || password.length < 6) {
-    throw new ValidationError('Пароль должен содержать минимум 6 символов');
+  // Увеличили требования к паролю с 6 до 8 символов
+  if (!password || typeof password !== 'string' || password.length < 8) {
+    throw new ValidationError('Пароль должен содержать минимум 8 символов');
   }
   
   if (phone && (typeof phone !== 'string' || phone.trim().length < 10)) {

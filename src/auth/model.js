@@ -19,7 +19,7 @@ export async function getUserById(id) {
 
 export async function createUser(userData) {
   const { email, password, phone } = userData;
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await bcrypt.hash(password, 12); // Увеличили с 10 до 12
   
   const [result] = await pool.execute(
     'INSERT INTO users (email, password, phone) VALUES (?, ?, ?)',

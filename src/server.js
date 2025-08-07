@@ -1,60 +1,63 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import { config } from './config/index.js';
+import cookieParser from 'cookie-parser';
 import { checkConnection } from './database/index.js';
 import { catalogRoutes } from './catalog/index.js';
+import { authRoutes } from './auth/index.js';
 
-// Создаем приложение
 const app = express();
+const PORT = process.env.PORT || 8000;
 
-// Middleware для безопасности
-app.use(helmet());
-app.use(cors({
-  origin: config.corsOrigins,
-  credentials: true
+// Простые middleware
+app.use(cors({ 
+  origin: true, 
+  credentials: true 
 }));
-
-// Rate limiting для защиты от DDoS
-const limiter = rateLimit(config.rateLimit);
-app.use('/api/', limiter);
-
-// Парсинг JSON
 app.use(express.json());
+app.use(cookieParser());
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-// Информация об API
+// Главная страница
 app.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'NNV Store API',
     version: '1.0.0',
     endpoints: {
-      catalog: 'GET /api/catalog?page=1&per_page=20',
-      product: 'GET /api/catalog/:id',
-      health: 'GET /health'
+      // Каталог
+      catalog: 'GET /catalog?page=1&per_page=20',
+      product: 'GET /catalog/:id',
+      addProduct: 'POST /catalog',
+      updateProduct: 'PUT /catalog/:id',
+      
+      // Аутентификация
+      register: 'POST /auth/register',
+      login: 'POST /auth/login',
+      profile: 'GET /auth/me',
+      logout: 'POST /auth/logout'
     }
   });
 });
 
-// Подключаем маршруты каталога
-app.use('/api', catalogRoutes);
+// Подключаем роуты БЕЗ /api префикса
+app.use('', catalogRoutes);
+app.use('', authRoutes);
+
+// Проверка здоровья
+app.get('/health', async (req, res) => {
+  const dbConnected = await checkConnection();
+  res.json({
+    success: true,
+    status: 'OK',
+    database: dbConnected ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // 404 handler
-app.use((req, res) => {
+app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Маршрут не найден'
+    message: `Маршрут ${req.method} ${req.url} не найден`
   });
 });
 
@@ -69,18 +72,24 @@ app.use((err, req, res, next) => {
 
 // Запуск сервера
 async function startServer() {
+  // Проверяем JWT_SECRET
+  if (!process.env.JWT_SECRET) {
+    console.error('❌ JWT_SECRET не установлен в .env');
+    process.exit(1);
+  }
+  
   // Проверяем подключение к БД
   const dbConnected = await checkConnection();
   if (!dbConnected) {
+    console.error('❌ Не удалось подключиться к базе данных');
     process.exit(1);
   }
   
   // Запускаем сервер
-  app.listen(config.port, () => {
-    console.log(`🚀 Сервер запущен на порту ${config.port}`);
-    console.log(`📝 Проверка: http://localhost:${config.port}/health`);
-    console.log(`🔒 Rate limit: ${config.rateLimit.max} запросов в минуту`);
-    console.log(`✨ Модульная структура загружена`);
+  app.listen(PORT, () => {
+    console.log(`🚀 Сервер запущен на порту ${PORT}`);
+    console.log(`📝 Главная: http://localhost:${PORT}/`);
+    console.log(`✅ Готов к работе!`);
   });
 }
 

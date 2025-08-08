@@ -38,7 +38,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Подключаем роуты БЕЗ /api префикса
+// Подключаем роуты
 app.use('', catalogRoutes);
 app.use('', authRoutes);
 

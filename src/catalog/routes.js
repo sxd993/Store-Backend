@@ -1,14 +1,33 @@
 import { Router } from 'express';
-import { getCatalog, getProductById, addProduct, updateProduct } from './model.js';
-import { validatePagination, validateId, validateProduct, handleError, ValidationError } from './schema.js';
+import { getCatalog, getProductById, addProduct, updateProduct, getFilterOptions } from './model.js';
+import { validatePagination, validateId, validateProduct, validateFilters, handleError, ValidationError } from './schema.js';
 
 const router = Router();
+
+// GET /catalog/filters - Данные для фильтров
+router.get('/catalog/filters', async (req, res) => {
+  try {
+    const filterData = await getFilterOptions();
+    res.json({ success: true, data: filterData });
+  } catch (error) {
+    handleError(res, error, 'Ошибка получения данных фильтров');
+  }
+});
 
 // GET /catalog - Каталог товаров
 router.get('/catalog', async (req, res) => {
   try {
     const { page, per_page } = validatePagination(req.query.page, req.query.per_page);
-    const result = await getCatalog(page, per_page);
+    
+    const filters = validateFilters({
+      category: req.query.category,
+      brand: req.query.brand,
+      model: req.query.model,
+      color: req.query.color,
+      memory: req.query.memory
+    });
+
+    const result = await getCatalog(page, per_page, filters);
     res.json({ success: true, data: result });
   } catch (error) {
     handleError(res, error, 'Ошибка получения каталога');

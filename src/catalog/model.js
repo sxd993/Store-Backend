@@ -1,25 +1,74 @@
 import { pool } from '../database/index.js';
+import { validateId, validateProduct, validatePagination } from './schema.js';
 
-// Получить каталог с пагинацией
-export async function getCatalog(page, per_page) {
+const filterCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000;
+
+// Получить данные для фильтров
+export async function getFilterOptions() {
+  const cached = filterCache.get('filters');
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  try {
+    const [categories] = await pool.query(
+      'SELECT DISTINCT category FROM products WHERE stock_quantity > 0 ORDER BY category'
+    );
+    
+    const [brands] = await pool.query(
+      'SELECT DISTINCT brand FROM products WHERE stock_quantity > 0 ORDER BY brand'
+    );
+    
+    const [models] = await pool.query(
+      'SELECT DISTINCT model FROM products WHERE stock_quantity > 0 ORDER BY model'
+    );
+    
+    const [colors] = await pool.query(
+      'SELECT DISTINCT color FROM products WHERE stock_quantity > 0 ORDER BY color'
+    );
+    
+    const [memory] = await pool.query(
+      'SELECT DISTINCT memory FROM products WHERE stock_quantity > 0 ORDER BY memory'
+    );
+
+    const data = {
+      category: categories.map(r => r.category),
+      brand: brands.map(r => r.brand),
+      model: models.map(r => r.model),
+      colors: colors.map(r => r.color),
+      memory: memory.map(r => r.memory)
+    };
+
+    filterCache.set('filters', { data, timestamp: Date.now() });
+    return data;
+  } catch (error) {
+    console.error('Ошибка в getFilterOptions:', error);
+    throw error;
+  }
+}
+
+// Получить каталог с пагинацией и фильтрами
+export async function getCatalog(page, per_page, filters = {}) {
   try {
     const { page: validatedPage, per_page: validatedPerPage } = validatePagination(page, per_page);
 
     const safeLimit = Math.max(1, Math.min(50, validatedPerPage));
     const safeOffset = Math.max(0, (validatedPage - 1) * validatedPerPage);
 
+    const { whereClause, queryParams } = buildWhereClause(filters);
+
     const query = `
       SELECT id, price, stock_quantity, model, color, memory, category, image, description, brand
       FROM products 
-      WHERE stock_quantity > 0 
+      ${whereClause}
       ORDER BY id ASC 
       LIMIT ${safeLimit} OFFSET ${safeOffset}
     `;
-    const [items] = await pool.query(query);
+    const [items] = await pool.query(query, queryParams);
 
-    const [countRows] = await pool.query(
-      `SELECT COUNT(*) as total FROM products WHERE stock_quantity > 0`
-    );
+    const countQuery = `SELECT COUNT(*) as total FROM products ${whereClause}`;
+    const [countRows] = await pool.query(countQuery, queryParams);
 
     const total = countRows.length ? countRows[0].total : 0;
     const pages = Math.ceil(total / validatedPerPage);
@@ -42,6 +91,39 @@ export async function getCatalog(page, per_page) {
     console.error('Ошибка в getCatalog:', error);
     throw error;
   }
+}
+
+function buildWhereClause(filters) {
+  const conditions = ['stock_quantity > 0'];
+  const queryParams = [];
+
+  if (filters.category && filters.category !== 'Все категории') {
+    conditions.push('category = ?');
+    queryParams.push(filters.category);
+  }
+
+  if (filters.brand && filters.brand !== 'Все бренды') {
+    conditions.push('brand = ?');
+    queryParams.push(filters.brand);
+  }
+
+  if (filters.model && filters.model !== 'all') {
+    conditions.push('model = ?');
+    queryParams.push(filters.model);
+  }
+
+  if (filters.color && filters.color !== 'all') {
+    conditions.push('color = ?');
+    queryParams.push(filters.color);
+  }
+
+  if (filters.memory && filters.memory !== 'all') {
+    conditions.push('memory = ?');
+    queryParams.push(filters.memory);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  return { whereClause, queryParams };
 }
 
 // Обновить товар
@@ -73,6 +155,9 @@ export async function updateProduct(id, productData) {
     if (result.affectedRows === 0) {
       throw new Error('Товар не найден или не изменен');
     }
+
+    // Очищаем кеш при изменении товаров
+    filterCache.delete('filters');
 
     return {
       id: validatedId,
@@ -149,6 +234,9 @@ export async function addProduct(productData) {
       brand
     ]);
 
+    // Очищаем кеш при добавлении товаров
+    filterCache.delete('filters');
+
     return {
       id: result.insertId,
       price: parseFloat(price),
@@ -165,103 +253,4 @@ export async function addProduct(productData) {
     console.error('Ошибка в addProduct:', error);
     throw error;
   }
-}
-
-// Кастомный класс для ошибок валидации
-export class ValidationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'ValidationError';
-  }
-}
-
-// Валидация пагинации
-export function validatePagination(page, per_page) {
-  const parsedPage = parseInt(page);
-  const parsedPerPage = parseInt(per_page);
-
-  return {
-    page: isNaN(parsedPage) ? 1 : Math.max(1, Math.min(10000, parsedPage)),
-    per_page: isNaN(parsedPerPage) ? 20 : Math.max(1, Math.min(50, parsedPerPage)),
-  };
-}
-
-// Валидация ID товара
-export function validateId(id) {
-  const numId = parseInt(id);
-  if (isNaN(numId) || numId < 1) {
-    throw new ValidationError('ID товара должен быть положительным числом');
-  }
-  return numId;
-}
-
-// Функция базовой санитизации строк
-function basicSanitize(str) {
-  if (!str) return str;
-  return str.replace(/<script.*?>.*?<\/script>/gi, '')
-           .replace(/javascript:/gi, '')
-           .replace(/on\w+\s*=/gi, '');
-}
-
-// Валидация данных товара для добавления/обновления
-export function validateProduct(productData) {
-  if (!productData || typeof productData !== 'object') {
-    throw new ValidationError('Данные товара обязательны');
-  }
-
-  const { price, stock_quantity, model, color, memory, category, image, description, brand } = productData;
-
-  if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
-    throw new ValidationError('Цена должна быть положительным числом');
-  }
-
-  if (stock_quantity === undefined || isNaN(parseInt(stock_quantity)) || parseInt(stock_quantity) < 0) {
-    throw new ValidationError('Количество на складе должно быть неотрицательным числом');
-  }
-
-  if (!model || typeof model !== 'string' || model.trim().length === 0) {
-    throw new ValidationError('Модель товара обязательна');
-  }
-
-  if (!color || typeof color !== 'string' || color.trim().length === 0) {
-    throw new ValidationError('Цвет товара обязателен');
-  }
-
-  if (!memory || typeof memory !== 'string' || memory.trim().length === 0) {
-    throw new ValidationError('Объем памяти обязателен');
-  }
-
-  if (!category || typeof category !== 'string' || category.trim().length === 0) {
-    throw new ValidationError('Категория товара обязательна');
-  }
-
-  if (!image || typeof image !== 'string' || image.trim().length === 0) {
-    throw new ValidationError('Изображение товара обязательно');
-  }
-
-  if (!description || typeof description !== 'string' || description.trim().length === 0) {
-    throw new ValidationError('Описание товара обязательно');
-  }
-
-  if (!brand || typeof brand !== 'string' || brand.trim().length === 0) {
-    throw new ValidationError('Бренд товара обязателен');
-  }
-
-  return {
-    price: parseFloat(price),
-    stock_quantity: parseInt(stock_quantity),
-    model: basicSanitize(model.trim()),
-    color: basicSanitize(color.trim()),
-    memory: basicSanitize(memory.trim()),
-    category: basicSanitize(category.trim()),
-    image: basicSanitize(image.trim()),
-    description: basicSanitize(description.trim()),
-    brand: basicSanitize(brand.trim())
-  };
-}
-
-// Обработка ошибок
-export function handleError(res, error, message = 'Внутренняя ошибка сервера') {
-  console.error('Error:', error);
-  res.status(500).json({ success: false, message });
 }

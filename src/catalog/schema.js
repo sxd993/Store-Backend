@@ -1,3 +1,5 @@
+
+
 // Кастомный класс для ошибок валидации
 export class ValidationError extends Error {
   constructor(message) {
@@ -29,8 +31,8 @@ export function validateId(id) {
 function basicSanitize(str) {
   if (!str) return str;
   return str.replace(/<script.*?>.*?<\/script>/gi, '')
-           .replace(/javascript:/gi, '')
-           .replace(/on\w+\s*=/gi, '');
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '');
 }
 
 // Валидация данных товара для добавления
@@ -40,19 +42,19 @@ export function validateProduct(productData) {
   }
 
   const { name, price, stock_quantity, color, memory, image, description } = productData;
-  
+
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     throw new ValidationError('Название товара обязательно');
   }
-  
+
   if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
     throw new ValidationError('Цена должна быть положительным числом');
   }
-  
+
   if (stock_quantity === undefined || isNaN(parseInt(stock_quantity)) || parseInt(stock_quantity) < 0) {
     throw new ValidationError('Количество на складе должно быть неотрицательным числом или большим нуля');
   }
-  
+
   return {
     name: name.trim(),
     price: parseFloat(price),
@@ -64,6 +66,27 @@ export function validateProduct(productData) {
     name: basicSanitize(name.trim()),
     description: basicSanitize(description.trim())
   };
+}
+
+// Валидация фильтров
+export function validateFilters(filters) {
+  if (!filters || typeof filters !== 'object') {
+    return {};
+  }
+
+  const validatedFilters = {};
+  const stringFilters = ['category', 'brand', 'model', 'color', 'memory'];
+
+  stringFilters.forEach(filterKey => {
+    if (filters[filterKey] && typeof filters[filterKey] === 'string') {
+      const trimmed = filters[filterKey].trim();
+      if (trimmed.length > 0 && trimmed.length <= 100) {
+        validatedFilters[filterKey] = trimmed;
+      }
+    }
+  });
+
+  return validatedFilters;
 }
 
 // Обработка ошибок

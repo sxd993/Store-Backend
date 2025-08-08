@@ -1,6 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { getUserById } from '../auth/model.js';
-
+import { getUserById } from '../model.js';
 // Единственный middleware - проверка токена
 export const authenticateToken = async (req, res, next) => {
   try {

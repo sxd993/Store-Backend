@@ -2,8 +2,7 @@ import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { getUserByEmail, createUser, verifyPassword, emailExists } from './model.js';
 import { validateRegister, validateLogin, handleError, ValidationError } from './schema.js';
-import { authenticateToken } from '../middleware/auth.js'; // ЕДИНСТВЕННЫЙ новый импорт
-
+import { authenticateToken } from '../auth/middleware/auth.js'; 
 const router = Router();
 
 // Простая защита от брутфорса (ваш стиль - в памяти)
@@ -39,7 +38,7 @@ function generateToken(user) {
   );
 }
 
-// Регистрация - БЕЗ ИЗМЕНЕНИЙ (только улучшенные cookies)
+// Регистрация 
 router.post('/auth/register', async (req, res) => {
   try {
     const validatedData = validateRegister(req.body);
@@ -57,7 +56,7 @@ router.post('/auth/register', async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict', // Добавили для безопасности
+      sameSite: 'strict',
       maxAge: 2 * 60 * 60 * 1000 // 2 часа
     });
     
@@ -83,12 +82,11 @@ router.post('/auth/register', async (req, res) => {
   }
 });
 
-// Логин с простой защитой от брутфорса
+// Логин
 router.post('/auth/login', async (req, res) => {
   try {
     const validatedData = validateLogin(req.body);
     
-    // Проверяем лимит попыток
     const attempts = failedAttempts.get(validatedData.email) || { count: 0, lastAttempt: 0 };
     const now = Date.now();
     
@@ -142,13 +140,12 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
-// ГЛАВНОЕ ИЗМЕНЕНИЕ: /auth/me теперь использует middleware
+// Получение данных о пользователе
 router.get('/auth/me', authenticateToken, async (req, res) => {
-  // Пользователь уже проверен в middleware и доступен в req.user
   res.json({ success: true, data: req.user });
 });
 
-// Logout остается без изменений
+// Logout
 router.post('/auth/logout', (req, res) => {
   res.clearCookie('token', {
     httpOnly: true,

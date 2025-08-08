@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { getUserById } from '../model.js';
-// Единственный middleware - проверка токена
+
 export const authenticateToken = async (req, res, next) => {
   try {
     const token = req.cookies.token;
@@ -22,14 +22,13 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
     
-    req.user = user; // Сохраняем пользователя для использования в роуте
+    req.user = user;
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
-        message: 'Токен истек. Войдите заново.',
-        code: 'TOKEN_EXPIRED'
+        message: 'Токен истек'
       });
     }
     

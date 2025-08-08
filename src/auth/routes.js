@@ -1,44 +1,18 @@
 import { Router } from 'express';
-import jwt from 'jsonwebtoken';
 import { getUserByEmail, createUser, verifyPassword, emailExists } from './model.js';
-import { validateRegister, validateLogin, handleError, ValidationError } from './schema.js';
-import { authenticateToken } from '../auth/middleware/auth.js'; 
+import { validateRegister, validateLogin, ValidationError } from './schema.js';
+import { authenticateToken } from './middleware/auth.js';
+import { 
+  checkRateLimit, 
+  recordAttempt, 
+  generateToken, 
+  setCookieToken, 
+  clearCookieToken 
+} from './utils/utils.js';
+
 const router = Router();
 
-// Простая защита от брутфорса (ваш стиль - в памяти)
-const failedAttempts = new Map();
-
-function checkAndRecordAttempt(email, success) {
-  if (!email) return true;
-  
-  const attempts = failedAttempts.get(email) || { count: 0, lastAttempt: 0 };
-  const now = Date.now();
-  
-  // Сброс через 15 минут
-  if (now - attempts.lastAttempt > 15 * 60 * 1000) {
-    attempts.count = 0;
-  }
-  
-  if (!success) {
-    attempts.count++;
-    attempts.lastAttempt = now;
-    failedAttempts.set(email, attempts);
-  } else {
-    failedAttempts.delete(email);
-  }
-  
-  return attempts.count < 5;
-}
-
-function generateToken(user) {
-  return jwt.sign(
-    { id: user.id, email: user.email, isAdmin: user.is_admin },
-    process.env.JWT_SECRET,
-    { expiresIn: '2h' } // Как вы хотели
-  );
-}
-
-// Регистрация 
+// Регистрация
 router.post('/auth/register', async (req, res) => {
   try {
     const validatedData = validateRegister(req.body);
@@ -52,13 +26,7 @@ router.post('/auth/register', async (req, res) => {
     
     const user = await createUser(validatedData);
     const token = generateToken(user);
-    
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 2 * 60 * 60 * 1000 // 2 часа
-    });
+    setCookieToken(res, token);
     
     res.status(201).json({
       success: true,
@@ -78,7 +46,12 @@ router.post('/auth/register', async (req, res) => {
         message: error.message 
       });
     }
-    handleError(res, error, 'Ошибка регистрации');
+    
+    console.error('Registration error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Ошибка регистрации' 
+    });
   }
 });
 
@@ -87,10 +60,7 @@ router.post('/auth/login', async (req, res) => {
   try {
     const validatedData = validateLogin(req.body);
     
-    const attempts = failedAttempts.get(validatedData.email) || { count: 0, lastAttempt: 0 };
-    const now = Date.now();
-    
-    if (now - attempts.lastAttempt < 15 * 60 * 1000 && attempts.count >= 5) {
+    if (!checkRateLimit(validatedData.email)) {
       return res.status(429).json({
         success: false,
         message: 'Слишком много попыток. Подождите 15 минут.'
@@ -100,23 +70,17 @@ router.post('/auth/login', async (req, res) => {
     const user = await getUserByEmail(validatedData.email);
     
     if (!user || !(await verifyPassword(user, validatedData.password))) {
-      checkAndRecordAttempt(validatedData.email, false);
+      recordAttempt(validatedData.email, false);
       return res.status(401).json({
         success: false,
         message: 'Неверный email или пароль'
       });
     }
     
-    checkAndRecordAttempt(validatedData.email, true);
+    recordAttempt(validatedData.email, true);
     
     const token = generateToken(user);
-    
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 2 * 60 * 60 * 1000
-    });
+    setCookieToken(res, token);
     
     res.json({
       success: true,
@@ -136,22 +100,23 @@ router.post('/auth/login', async (req, res) => {
         message: error.message 
       });
     }
-    handleError(res, error, 'Ошибка входа');
+    
+    console.error('Login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Ошибка входа' 
+    });
   }
 });
 
-// Получение данных о пользователе
-router.get('/auth/me', authenticateToken, async (req, res) => {
+// Получение данных пользователя
+router.get('/auth/me', authenticateToken, (req, res) => {
   res.json({ success: true, data: req.user });
 });
 
 // Logout
 router.post('/auth/logout', (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
-  });
+  clearCookieToken(res);
   res.json({ 
     success: true, 
     message: 'Выход выполнен успешно' 

@@ -5,6 +5,59 @@ export class ValidationError extends Error {
   }
 }
 
+// Только критичные проверки для защиты от атак
+function validateEmail(email) {
+  if (!email || typeof email !== 'string') {
+    throw new ValidationError('Email обязателен');
+  }
+  
+  const trimmed = email.trim();
+  
+  // Защита от XSS и injection
+  if (trimmed.length > 254 || trimmed.includes('<') || trimmed.includes('>')) {
+    throw new ValidationError('Неверный формат email');
+  }
+  
+  // Минимальная проверка формата
+  if (!trimmed.includes('@') || trimmed.length < 5) {
+    throw new ValidationError('Неверный формат email');
+  }
+  
+  return trimmed.toLowerCase();
+}
+
+function validatePassword(password) {
+  if (!password || typeof password !== 'string') {
+    throw new ValidationError('Пароль обязателен');
+  }
+  
+  // Защита от слишком коротких/длинных паролей
+  if (password.length < 6 || password.length > 128) {
+    throw new ValidationError('Неверная длина пароля');
+  }
+  
+  return password;
+}
+
+function validatePhone(phone, required = false) {
+  if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
+    if (required) {
+      throw new ValidationError('Номер телефона обязателен');
+    }
+    return null;
+  }
+  
+  const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
+  
+  // Защита от injection и слишком длинных значений
+  if (cleaned.length < 8 || cleaned.length > 20 || !/^\+?\d+$/.test(cleaned)) {
+    throw new ValidationError('Неверный формат телефона');
+  }
+  
+  return cleaned;
+}
+
+// Основные функции валидации
 export function validateRegister(userData) {
   if (!userData || typeof userData !== 'object') {
     throw new ValidationError('Данные пользователя обязательны');
@@ -12,28 +65,10 @@ export function validateRegister(userData) {
 
   const { email, password, phone } = userData;
   
-  if (!email || typeof email !== 'string' || email.trim().length === 0) {
-    throw new ValidationError('Email обязателен');
-  }
-  
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email.trim())) {
-    throw new ValidationError('Неверный формат email');
-  }
-  
-  // Увеличили требования к паролю с 6 до 8 символов
-  if (!password || typeof password !== 'string' || password.length < 8) {
-    throw new ValidationError('Пароль должен содержать минимум 8 символов');
-  }
-  
-  if (phone && (typeof phone !== 'string' || phone.trim().length < 10)) {
-    throw new ValidationError('Неверный формат телефона');
-  }
-  
   return {
-    email: email.trim().toLowerCase(),
-    password: password,
-    phone: phone ? phone.trim() : null
+    email: validateEmail(email),
+    password: validatePassword(password),
+    phone: validatePhone(phone, true)
   };
 }
 
@@ -44,11 +79,11 @@ export function validateLogin(userData) {
 
   const { email, password } = userData;
   
-  if (!email || typeof email !== 'string' || email.trim().length === 0) {
+  if (!email || typeof email !== 'string') {
     throw new ValidationError('Email обязателен');
   }
   
-  if (!password || typeof password !== 'string' || password.length === 0) {
+  if (!password || typeof password !== 'string') {
     throw new ValidationError('Пароль обязателен');
   }
   

@@ -26,6 +26,26 @@ function validateEmail(email) {
   return trimmed.toLowerCase();
 }
 
+function validateName(name) {
+  if (!name || typeof name !== 'string') {
+    throw new ValidationError('Имя обязательно');
+  }
+  
+  const trimmed = name.trim();
+  
+  // Защита от XSS и injection
+  if (trimmed.length < 2 || trimmed.length > 50 || trimmed.includes('<') || trimmed.includes('>')) {
+    throw new ValidationError('Имя должно содержать от 2 до 50 символов');
+  }
+  
+  // Проверка на допустимые символы (буквы, пробелы, дефисы)
+  if (!/^[а-яёa-z\s-]+$/i.test(trimmed)) {
+    throw new ValidationError('Имя может содержать только буквы, пробелы и дефисы');
+  }
+  
+  return trimmed;
+}
+
 function validatePassword(password) {
   if (!password || typeof password !== 'string') {
     throw new ValidationError('Пароль обязателен');
@@ -63,10 +83,11 @@ export function validateRegister(userData) {
     throw new ValidationError('Данные пользователя обязательны');
   }
 
-  const { email, password, phone } = userData;
+  const { email, password, phone, name } = userData;
   
   return {
     email: validateEmail(email),
+    name: validateName(name),
     password: validatePassword(password),
     phone: validatePhone(phone, true)
   };

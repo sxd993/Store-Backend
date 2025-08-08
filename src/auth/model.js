@@ -8,7 +8,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 минут
 // Для логина - с паролем
 export async function getUserByEmail(email) {
   const [rows] = await pool.execute(
-    'SELECT id, email, password, phone, is_admin FROM users WHERE email = ?',
+    'SELECT id, email, password, phone, name, is_admin FROM users WHERE email = ?',
     [email]
   );
   return rows[0] || null;
@@ -25,7 +25,7 @@ export async function getUserById(id) {
   }
   
   const [rows] = await pool.execute(
-    'SELECT id, email, phone, is_admin, created_at FROM users WHERE id = ?',
+    'SELECT id, email, phone, name, is_admin, created_at FROM users WHERE id = ?',
     [id]
   );
   
@@ -43,18 +43,19 @@ export async function getUserById(id) {
 }
 
 export async function createUser(userData) {
-  const { email, password, phone } = userData;
+  const { email, password, phone, name } = userData;
   const hashedPassword = await bcrypt.hash(password, 12);
   
   const [result] = await pool.execute(
-    'INSERT INTO users (email, password, phone) VALUES (?, ?, ?)',
-    [email, hashedPassword, phone]
+    'INSERT INTO users (email, password, phone, name) VALUES (?, ?, ?, ?)',
+    [email, hashedPassword, phone, name]
   );
   
   return {
     id: result.insertId,
     email,
     phone,
+    name,
     is_admin: false
   };
 }

@@ -11,7 +11,7 @@ export function checkRateLimit(email) {
     attempts.count = 0;
   }
   
-  return attempts.count < 5;
+  return attempts.count < 15;
 }
 
 export function recordAttempt(email, success) {

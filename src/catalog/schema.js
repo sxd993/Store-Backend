@@ -1,4 +1,3 @@
-// Кастомный класс для ошибок валидации
 export class ValidationError extends Error {
   constructor(message) {
     super(message);
@@ -6,7 +5,6 @@ export class ValidationError extends Error {
   }
 }
 
-// Валидация пагинации
 export function validatePagination(page, per_page) {
   const parsedPage = parseInt(page);
   const parsedPerPage = parseInt(per_page);
@@ -17,7 +15,6 @@ export function validatePagination(page, per_page) {
   };
 }
 
-// Валидация ID товара
 export function validateId(id) {
   const numId = parseInt(id);
   if (isNaN(numId) || numId < 1) {
@@ -33,15 +30,49 @@ function basicSanitize(str) {
     .replace(/on\w+\s*=/gi, '');
 }
 
-// Валидация данных товара для добавления/обновления
+function validateImageUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  
+  const trimmed = url.trim();
+  if (trimmed.length === 0 || trimmed.length > 2048) return false;
+  
+  try {
+    const urlObj = new URL(trimmed);
+    return ['http:', 'https:'].includes(urlObj.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function validateImages(images) {
+  if (!images) return [];
+  
+  if (!Array.isArray(images)) {
+    throw new ValidationError('Изображения должны быть массивом');
+  }
+  
+  if (images.length > 20) {
+    throw new ValidationError('Максимум 20 изображений');
+  }
+  
+  const validImages = images
+    .filter(url => validateImageUrl(url))
+    .map(url => url.trim());
+    
+  if (images.length > 0 && validImages.length === 0) {
+    throw new ValidationError('Все изображения имеют некорректный формат URL');
+  }
+  
+  return validImages;
+}
+
 export function validateProduct(productData) {
   if (!productData || typeof productData !== 'object') {
     throw new ValidationError('Данные товара обязательны');
   }
 
-  const { brand, model, category, price, stock_quantity, color, memory, image, description } = productData;
+  const { brand, model, category, price, stock_quantity, color, memory, description, images } = productData;
 
-  // Обязательные поля
   if (!brand || !brand.trim()) {
     throw new ValidationError('Бренд обязателен');
   }
@@ -62,6 +93,8 @@ export function validateProduct(productData) {
     throw new ValidationError('Количество на складе должно быть неотрицательным числом');
   }
 
+  const validatedImages = validateImages(images);
+
   return {
     brand: basicSanitize(brand.trim()),
     model: basicSanitize(model.trim()),
@@ -70,12 +103,11 @@ export function validateProduct(productData) {
     stock_quantity: parseInt(stock_quantity),
     color: color ? basicSanitize(color.trim()) : null,
     memory: memory ? basicSanitize(memory.trim()) : null,
-    image: image ? image.trim() : null,
-    description: description ? basicSanitize(description.trim()) : null
+    description: description ? basicSanitize(description.trim()) : null,
+    images: validatedImages
   };
 }
 
-// Валидация фильтров
 export function validateFilters(filters) {
   if (!filters || typeof filters !== 'object') {
     return {};
@@ -96,7 +128,6 @@ export function validateFilters(filters) {
   return validatedFilters;
 }
 
-// Обработка ошибок
 export function handleError(res, error, message = 'Внутренняя ошибка сервера') {
   console.error('Error:', error);
   res.status(500).json({ success: false, message });

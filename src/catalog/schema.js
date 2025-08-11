@@ -1,5 +1,3 @@
-
-
 // Кастомный класс для ошибок валидации
 export class ValidationError extends Error {
   constructor(message) {
@@ -35,16 +33,25 @@ function basicSanitize(str) {
     .replace(/on\w+\s*=/gi, '');
 }
 
-// Валидация данных товара для добавления
+// Валидация данных товара для добавления/обновления
 export function validateProduct(productData) {
   if (!productData || typeof productData !== 'object') {
     throw new ValidationError('Данные товара обязательны');
   }
 
-  const { name, price, stock_quantity, color, memory, image, description } = productData;
+  const { brand, model, category, price, stock_quantity, color, memory, image, description } = productData;
 
-  if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    throw new ValidationError('Название товара обязательно');
+  // Обязательные поля
+  if (!brand || !brand.trim()) {
+    throw new ValidationError('Бренд обязателен');
+  }
+
+  if (!model || !model.trim()) {
+    throw new ValidationError('Модель обязательна');
+  }
+
+  if (!category || !category.trim()) {
+    throw new ValidationError('Категория обязательна');
   }
 
   if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
@@ -52,19 +59,19 @@ export function validateProduct(productData) {
   }
 
   if (stock_quantity === undefined || isNaN(parseInt(stock_quantity)) || parseInt(stock_quantity) < 0) {
-    throw new ValidationError('Количество на складе должно быть неотрицательным числом или большим нуля');
+    throw new ValidationError('Количество на складе должно быть неотрицательным числом');
   }
 
   return {
-    name: name.trim(),
+    brand: basicSanitize(brand.trim()),
+    model: basicSanitize(model.trim()),
+    category: basicSanitize(category.trim()),
     price: parseFloat(price),
     stock_quantity: parseInt(stock_quantity),
-    color: color ? color.trim() : null,
-    memory: memory ? memory.trim() : null,
+    color: color ? basicSanitize(color.trim()) : null,
+    memory: memory ? basicSanitize(memory.trim()) : null,
     image: image ? image.trim() : null,
-    description: description ? description.trim() : null,
-    name: basicSanitize(name.trim()),
-    description: basicSanitize(description.trim())
+    description: description ? basicSanitize(description.trim()) : null
   };
 }
 

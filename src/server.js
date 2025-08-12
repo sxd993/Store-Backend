@@ -10,10 +10,10 @@ import { bestOffersRoutes } from './bestOffers/index.js';
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Простые middleware
-app.use(cors({ 
-  origin: true, 
-  credentials: true 
+// Middleware
+app.use(cors({
+  origin: true,
+  credentials: true
 }));
 app.use(express.json());
 app.use(cookieParser());
@@ -28,14 +28,20 @@ app.get('/', (req, res) => {
       // Каталог
       catalog: 'GET /catalog?page=1&per_page=20',
       product: 'GET /catalog/:id',
-      addProduct: 'POST /catalog',
-      updateProduct: 'PUT /catalog/:id',
-      
+
       // Аутентификация
       register: 'POST /auth/register',
       login: 'POST /auth/login',
       profile: 'GET /auth/me',
-      logout: 'POST /auth/logout'
+      logout: 'POST /auth/logout',
+
+      // Корзина
+      cart: 'GET /cart',
+      addToCart: 'POST /cart/add',
+      updateCart: 'PUT /cart/update',
+      removeFromCart: 'DELETE /cart/remove/:id',
+      clearCart: 'DELETE /cart/clear',
+      syncCart: 'POST /cart/sync'
     }
   });
 });
@@ -43,6 +49,7 @@ app.get('/', (req, res) => {
 // Подключаем роуты
 app.use('', catalogRoutes);
 app.use('', authRoutes);
+app.use('', cartRoutes);
 app.use('', bestOffersRoutes);
 
 // Проверка здоровья
@@ -56,21 +63,17 @@ app.get('/health', async (req, res) => {
   });
 });
 
-
-// Корзина
-app.use('/api', cartRoutes);
-
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: `Маршрут ${req.method} ${req.url} не найден`
+    message: `Маршрут ${req.method} ${req.originalUrl} не найден`
   });
 });
 
 // Обработчик ошибок
 app.use((err, req, res, next) => {
-  console.error('Ошибка:', err);
+  console.error('Ошибка сервера:', err);
   res.status(500).json({
     success: false,
     message: 'Внутренняя ошибка сервера'
@@ -79,32 +82,28 @@ app.use((err, req, res, next) => {
 
 // Запуск сервера
 async function startServer() {
-  // Проверяем JWT_SECRET
   if (!process.env.JWT_SECRET) {
     console.error('❌ JWT_SECRET не установлен в .env');
     process.exit(1);
   }
-  
-  // Проверяем подключение к БД
+
   const dbConnected = await checkConnection();
   if (!dbConnected) {
     console.error('❌ Не удалось подключиться к базе данных');
     process.exit(1);
   }
-  
-  // Запускаем сервер
+
   app.listen(PORT, () => {
     console.log(`🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📝 Главная: http://localhost:${PORT}/`);
+    console.log(`📝 API: http://localhost:${PORT}/`);
+    console.log(`🛒 Корзина: http://localhost:${PORT}/cart`);
     console.log(`✅ Готов к работе!`);
   });
 }
 
-// Запускаем
 startServer();
 
-// Обработка завершения
 process.on('SIGINT', () => {
-  console.log('\nЗавершение работы...');
+  console.log('\n🛑 Завершение работы сервера...');
   process.exit(0);
 });

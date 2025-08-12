@@ -1,6 +1,6 @@
+// src/cart/model.js
 import { pool } from '../database/index.js';
 
-// Кеш корзин пользователей
 const cartCache = new Map();
 const CACHE_TTL = 3 * 60 * 1000; // 3 минуты
 
@@ -11,7 +11,6 @@ export async function getUserCart(userId) {
   const cacheKey = `cart_${userId}`;
   const cached = cartCache.get(cacheKey);
   
-  // Проверяем кеш
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.cart;
   }
@@ -20,23 +19,23 @@ export async function getUserCart(userId) {
     SELECT 
       uc.product_id as id,
       uc.quantity,
-      p.name,
+      CONCAT(p.brand, ' ', p.model) as name,
       p.brand,
       p.model,
       p.price,
       p.category,
       p.color,
       p.memory,
-      p.image,
       p.stock_quantity,
-      uc.created_at as added_at
+      uc.created_at as added_at,
+      pi.image_url as image
     FROM user_carts uc
     JOIN products p ON uc.product_id = p.id
+    LEFT JOIN product_images pi ON p.id = pi.product_id AND pi.is_primary = 1
     WHERE uc.user_id = ?
     ORDER BY uc.created_at DESC
   `, [userId]);
   
-  // Кешируем результат
   cartCache.set(cacheKey, {
     cart: rows,
     timestamp: Date.now()
@@ -49,40 +48,31 @@ export async function getUserCart(userId) {
  * Добавить товар в корзину пользователя
  */
 export async function addToUserCart(userId, productId, quantity = 1) {
-  try {
-    // Проверяем существование товара и его наличие
-    const [productRows] = await pool.execute(
-      'SELECT id, stock_quantity FROM products WHERE id = ?',
-      [productId]
-    );
-    
-    if (productRows.length === 0) {
-      throw new Error('Товар не найден');
-    }
-    
-    if (productRows[0].stock_quantity < quantity) {
-      throw new Error('Недостаточно товара на складе');
-    }
-    
-    // Пытаемся добавить или обновить количество
-    await pool.execute(`
-      INSERT INTO user_carts (user_id, product_id, quantity)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE 
-        quantity = quantity + VALUES(quantity),
-        updated_at = CURRENT_TIMESTAMP
-    `, [userId, productId, quantity]);
-    
-    // Очищаем кеш
-    clearUserCartCache(userId);
-    
-    return await getUserCart(userId);
-  } catch (error) {
-    if (error.code === 'ER_DUP_ENTRY') {
-      throw new Error('Товар уже в корзине');
-    }
-    throw error;
+  // Проверяем существование товара и наличие
+  const [productRows] = await pool.execute(
+    'SELECT id, stock_quantity FROM products WHERE id = ?',
+    [productId]
+  );
+  
+  if (productRows.length === 0) {
+    throw new Error('Товар не найден');
   }
+  
+  if (productRows[0].stock_quantity < quantity) {
+    throw new Error('Недостаточно товара на складе');
+  }
+  
+  // Добавляем или обновляем количество
+  await pool.execute(`
+    INSERT INTO user_carts (user_id, product_id, quantity)
+    VALUES (?, ?, ?)
+    ON DUPLICATE KEY UPDATE 
+      quantity = quantity + VALUES(quantity),
+      updated_at = CURRENT_TIMESTAMP
+  `, [userId, productId, quantity]);
+  
+  clearUserCartCache(userId);
+  return await getUserCart(userId);
 }
 
 /**
@@ -158,7 +148,6 @@ export async function syncUserCart(userId, localCartItems) {
     return await getUserCart(userId);
   }
   
-  // Начинаем транзакцию
   const connection = await pool.getConnection();
   await connection.beginTransaction();
   
@@ -175,7 +164,7 @@ export async function syncUserCart(userId, localCartItems) {
     
     // Обрабатываем каждый товар из localStorage
     for (const item of localCartItems) {
-      const { product_id, quantity } = item;
+      const { id: product_id, quantity } = item; // item.id вместо item.product_id
       
       // Проверяем существование товара
       const [productExists] = await connection.execute(
@@ -183,7 +172,7 @@ export async function syncUserCart(userId, localCartItems) {
         [product_id]
       );
       
-      if (productExists.length === 0) continue; // Пропускаем несуществующие товары
+      if (productExists.length === 0) continue;
       
       const currentQuantity = currentCartMap.get(product_id) || 0;
       const newQuantity = currentQuantity + quantity;
@@ -212,86 +201,11 @@ export async function syncUserCart(userId, localCartItems) {
   }
 }
 
-/**
- * Получить информацию о товарах по их ID (для расчета актуальных цен)
- */
-export async function getCartItemsInfo(productIds) {
-  if (!Array.isArray(productIds) || productIds.length === 0) {
-    return [];
-  }
-  
-  const placeholders = productIds.map(() => '?').join(',');
-  const [rows] = await pool.execute(`
-    SELECT 
-      id,
-      name,
-      brand,
-      model,
-      price,
-      category,
-      color,
-      memory,
-      image,
-      stock_quantity,
-      (stock_quantity > 0) as available
-    FROM products 
-    WHERE id IN (${placeholders})
-  `, productIds);
-  
-  return rows;
-}
-
-/**
- * Получить количество товаров в корзине
- */
-export async function getCartItemsCount(userId) {
-  const [rows] = await pool.execute(
-    'SELECT COALESCE(SUM(quantity), 0) as total_items FROM user_carts WHERE user_id = ?',
-    [userId]
-  );
-  
-  return parseInt(rows[0].total_items) || 0;
-}
-
-/**
- * Проверить есть ли товар в корзине
- */
-export async function isItemInUserCart(userId, productId) {
-  const [rows] = await pool.execute(
-    'SELECT id FROM user_carts WHERE user_id = ? AND product_id = ?',
-    [userId, productId]
-  );
-  
-  return rows.length > 0;
-}
-
-/**
- * Получить количество конкретного товара в корзине
- */
-export async function getUserCartItemQuantity(userId, productId) {
-  const [rows] = await pool.execute(
-    'SELECT quantity FROM user_carts WHERE user_id = ? AND product_id = ?',
-    [userId, productId]
-  );
-  
-  return rows.length > 0 ? rows[0].quantity : 0;
-}
-
-// Утилиты для кеширования
+// Утилиты кеширования
 export function clearUserCartCache(userId) {
   cartCache.delete(`cart_${userId}`);
 }
 
 export function clearAllCartCache() {
   cartCache.clear();
-}
-
-// Очистка старых записей кеша
-export function cleanupCartCache() {
-  const now = Date.now();
-  for (const [key, cached] of cartCache.entries()) {
-    if (now - cached.timestamp > CACHE_TTL) {
-      cartCache.delete(key);
-    }
-  }
 }

@@ -6,17 +6,12 @@ import {
   updateCartItem,
   removeFromUserCart,
   clearUserCart,
-  syncUserCart,
-  getCartItemsInfo,
-  getCartItemsCount,
-  isItemInUserCart,
-  getUserCartItemQuantity
+  syncUserCart
 } from './model.js';
 import {
   validateAddToCart,
   validateUpdateCartItem,
   validateSyncCart,
-  validateProductIds,
   validateProductIdParam,
   CartValidationError,
   handleCartValidationError
@@ -33,8 +28,7 @@ router.get('/cart', authenticateToken, async (req, res) => {
     
     res.json({
       success: true,
-      data: cart,
-      message: cart.length > 0 ? 'Корзина загружена' : 'Корзина пуста'
+      data: cart
     });
   } catch (error) {
     console.error('Get cart error:', error);
@@ -60,8 +54,7 @@ router.post('/cart/add', authenticateToken, async (req, res) => {
     
     res.status(201).json({
       success: true,
-      data: cart,
-      message: 'Товар добавлен в корзину'
+      data: cart
     });
   } catch (error) {
     if (error instanceof CartValidationError) {
@@ -75,7 +68,7 @@ router.post('/cart/add', authenticateToken, async (req, res) => {
       });
     }
     
-    if (error.message.includes('недостаточно') || error.message.includes('наличие')) {
+    if (error.message.includes('недостаточно')) {
       return res.status(409).json({
         success: false,
         message: error.message
@@ -105,8 +98,7 @@ router.put('/cart/update', authenticateToken, async (req, res) => {
     
     res.json({
       success: true,
-      data: cart,
-      message: validatedData.quantity === 0 ? 'Товар удален из корзины' : 'Количество обновлено'
+      data: cart
     });
   } catch (error) {
     if (error instanceof CartValidationError) {
@@ -146,8 +138,7 @@ router.delete('/cart/remove/:productId', authenticateToken, async (req, res) => 
     
     res.json({
       success: true,
-      data: cart,
-      message: 'Товар удален из корзины'
+      data: cart
     });
   } catch (error) {
     if (error instanceof CartValidationError) {
@@ -178,8 +169,7 @@ router.delete('/cart/clear', authenticateToken, async (req, res) => {
     
     res.json({
       success: true,
-      data: cart,
-      message: 'Корзина очищена'
+      data: cart
     });
   } catch (error) {
     console.error('Clear cart error:', error);
@@ -201,8 +191,7 @@ router.post('/cart/sync', authenticateToken, async (req, res) => {
     
     res.json({
       success: true,
-      data: cart,
-      message: validatedData.items.length > 0 ? 'Корзина синхронизирована' : 'Нет товаров для синхронизации'
+      data: cart
     });
   } catch (error) {
     if (error instanceof CartValidationError) {
@@ -213,85 +202,6 @@ router.post('/cart/sync', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Ошибка синхронизации корзины'
-    });
-  }
-});
-
-/**
- * POST /cart/items-info - Получить актуальную информацию о товарах
- */
-router.post('/cart/items-info', authenticateToken, async (req, res) => {
-  try {
-    const validatedData = validateProductIds(req.body);
-    
-    const itemsInfo = await getCartItemsInfo(validatedData.product_ids);
-    
-    res.json({
-      success: true,
-      data: itemsInfo,
-      message: 'Информация о товарах получена'
-    });
-  } catch (error) {
-    if (error instanceof CartValidationError) {
-      return handleCartValidationError(res, error);
-    }
-    
-    console.error('Get cart items info error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Ошибка получения информации о товарах'
-    });
-  }
-});
-
-/**
- * GET /cart/count - Получить количество товаров в корзине
- */
-router.get('/cart/count', authenticateToken, async (req, res) => {
-  try {
-    const count = await getCartItemsCount(req.user.id);
-    
-    res.json({
-      success: true,
-      data: { count },
-      message: 'Количество товаров получено'
-    });
-  } catch (error) {
-    console.error('Get cart count error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Ошибка получения количества товаров'
-    });
-  }
-});
-
-/**
- * GET /cart/check/:productId - Проверить есть ли товар в корзине
- */
-router.get('/cart/check/:productId', authenticateToken, async (req, res) => {
-  try {
-    const productId = validateProductIdParam(req.params.productId);
-    
-    const inCart = await isItemInUserCart(req.user.id, productId);
-    const quantity = inCart ? await getUserCartItemQuantity(req.user.id, productId) : 0;
-    
-    res.json({
-      success: true,
-      data: { 
-        inCart,
-        quantity
-      },
-      message: 'Статус товара в корзине получен'
-    });
-  } catch (error) {
-    if (error instanceof CartValidationError) {
-      return handleCartValidationError(res, error);
-    }
-    
-    console.error('Check cart item error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Ошибка проверки товара в корзине'
     });
   }
 });

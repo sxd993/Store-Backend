@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { checkConnection } from './database/index.js';
 import { catalogRoutes } from './catalog/index.js';
 import { authRoutes } from './auth/index.js';
+import { cartRoutes } from './cart/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -52,6 +53,10 @@ app.get('/health', async (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+
+// Корзина
+app.use('/api', cartRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

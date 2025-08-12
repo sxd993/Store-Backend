@@ -1,0 +1,1 @@
+export { default as bestOffersRoutes } from './routes.js';

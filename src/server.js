@@ -5,6 +5,7 @@ import { checkConnection } from './database/index.js';
 import { catalogRoutes } from './catalog/index.js';
 import { authRoutes } from './auth/index.js';
 import { cartRoutes } from './cart/index.js';
+import { bestOffersRoutes } from './bestOffers/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -42,6 +43,7 @@ app.get('/', (req, res) => {
 // Подключаем роуты
 app.use('', catalogRoutes);
 app.use('', authRoutes);
+app.use('', bestOffersRoutes);
 
 // Проверка здоровья
 app.get('/health', async (req, res) => {

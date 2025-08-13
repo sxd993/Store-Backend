@@ -7,6 +7,7 @@ import { authRoutes } from './auth/index.js';
 import { cartRoutes } from './cart/index.js';
 import { bestOffersRoutes } from './bestOffers/index.js';
 import { searchRoutes } from './search/index.js';
+import { personalAccountRoutes } from './orders/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -42,7 +43,16 @@ app.get('/', (req, res) => {
       updateCart: 'PUT /cart/update',
       removeFromCart: 'DELETE /cart/remove/:id',
       clearCart: 'DELETE /cart/clear',
-      syncCart: 'POST /cart/sync'
+      syncCart: 'POST /cart/sync',
+
+      // Заказы
+      orders: 'GET /orders?page=1&per_page=20&status=Оплачен',
+      createOrder: 'POST /orders',
+      updateOrderStatus: 'PUT /orders/:id/status',
+
+      // Поиск и предложения
+      search: 'GET /search?q=query',
+      bestOffers: 'GET /best-offers'
     }
   });
 });
@@ -53,6 +63,7 @@ app.use('', authRoutes);
 app.use('', cartRoutes);
 app.use('', bestOffersRoutes);
 app.use('', searchRoutes);
+app.use('', personalAccountRoutes); // КРИТИЧЕСКИ ВАЖНО: подключаем роуты заказов
 
 // Проверка здоровья
 app.get('/health', async (req, res) => {
@@ -97,8 +108,6 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📝 API: http://localhost:${PORT}/`);
-    console.log(`🛒 Корзина: http://localhost:${PORT}/cart`);
     console.log(`✅ Готов к работе!`);
   });
 }

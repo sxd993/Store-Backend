@@ -7,7 +7,8 @@ import { authRoutes } from './auth/index.js';
 import { cartRoutes } from './cart/index.js';
 import { bestOffersRoutes } from './bestOffers/index.js';
 import { searchRoutes } from './search/index.js';
-import { personalAccountRoutes } from './orders/index.js';
+import { orderRoutes } from './orders/index.js';
+import { adminAccountRoutes } from './personal_account/admin/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -45,9 +46,11 @@ app.get('/', (req, res) => {
       clearCart: 'DELETE /cart/clear',
       syncCart: 'POST /cart/sync',
 
-      // Заказы
-      orders: 'GET /orders?page=1&per_page=20&status=Оплачен',
+      // Заказы (только создание)
       createOrder: 'POST /orders',
+
+      // Админка (список заказов и управление)
+      orders: 'GET /orders?page=1&per_page=20',
       updateOrderStatus: 'PUT /orders/:id/status',
 
       // Поиск и предложения
@@ -63,7 +66,8 @@ app.use('', authRoutes);
 app.use('', cartRoutes);
 app.use('', bestOffersRoutes);
 app.use('', searchRoutes);
-app.use('', personalAccountRoutes); // КРИТИЧЕСКИ ВАЖНО: подключаем роуты заказов
+app.use('', orderRoutes);        // Роуты создания заказов
+app.use('', adminAccountRoutes);  // Админские роуты (список заказов, управление)
 
 // Проверка здоровья
 app.get('/health', async (req, res) => {

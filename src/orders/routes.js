@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getOrders, createOrder, updateOrderStatus } from './model.js';
-import { validatePagination, validateId, validateOrderStatus, handleError } from './schema.js';
+import {  createOrder } from './model.js';
+import { validateId,  handleError } from './schema.js';
 
 const router = Router();
 

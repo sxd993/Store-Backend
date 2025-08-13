@@ -1,3 +1,3 @@
-export { default as adminAccountRoutes } from '../personal_account/admin/routes.js';
-export * from '../personal_account/admin/model.js';
-export * from '../personal_account/admin/schema.js';
+export { default as adminAccountRoutes } from './routes.js';
+export * from './model.js';
+export * from './schema.js';

@@ -1,4 +1,4 @@
-import { pool } from '../../database/index.js';
+import { pool } from '../database/index.js';
 import {  ValidationError } from './schema.js';
 
 /**

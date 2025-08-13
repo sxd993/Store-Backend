@@ -16,3 +16,22 @@ export function handleError(res, error, defaultMessage = 'Произошла о�
         message: defaultMessage
     });
 }
+
+// Кастомный класс ошибки валидации
+export class ValidationError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'ValidationError';
+    }
+}
+
+/**
+ * Валидация ID
+ */
+export function validateId(id) {
+    const numId = parseInt(id);
+    if (isNaN(numId) || numId < 1) {
+        throw new ValidationError('ID должен быть положительным числом');
+    }
+    return numId;
+}

@@ -77,19 +77,41 @@ function validatePhone(phone, required = false) {
   return cleaned;
 }
 
+// НОВАЯ ФУНКЦИЯ: Валидация hCaptcha токена
+function validateHCaptchaToken(token) {
+  if (!token || typeof token !== 'string') {
+    throw new ValidationError('Капча обязательна');
+  }
+  
+  const trimmed = token.trim();
+  
+  // Проверяем базовый формат hCaptcha токена
+  if (trimmed.length < 20 || trimmed.length > 2000) {
+    throw new ValidationError('Неверный формат токена капчи');
+  }
+  
+  // Защита от injection
+  if (trimmed.includes('<') || trimmed.includes('>') || trimmed.includes('script')) {
+    throw new ValidationError('Неверный формат токена капчи');
+  }
+  
+  return trimmed;
+}
+
 // Основные функции валидации
 export function validateRegister(userData) {
   if (!userData || typeof userData !== 'object') {
     throw new ValidationError('Данные пользователя обязательны');
   }
 
-  const { email, password, phone, name } = userData;
+  const { email, password, phone, name, hcaptcha_token } = userData;
   
   return {
     email: validateEmail(email),
     name: validateName(name),
     password: validatePassword(password),
-    phone: validatePhone(phone, true)
+    phone: validatePhone(phone, true),
+    hcaptcha_token: validateHCaptchaToken(hcaptcha_token)
   };
 }
 
@@ -98,7 +120,7 @@ export function validateLogin(userData) {
     throw new ValidationError('Данные для входа обязательны');
   }
 
-  const { email, password } = userData;
+  const { email, password, hcaptcha_token } = userData;
   
   if (!email || typeof email !== 'string') {
     throw new ValidationError('Email обязателен');
@@ -110,7 +132,8 @@ export function validateLogin(userData) {
   
   return {
     email: email.trim().toLowerCase(),
-    password: password
+    password: password,
+    hcaptcha_token: validateHCaptchaToken(hcaptcha_token)
   };
 }
 

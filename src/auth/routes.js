@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getUserByEmail, createUser, verifyPassword, emailExists } from './model.js';
 import { validateRegister, validateLogin, ValidationError } from './schema.js';
 import { authenticateToken } from './middleware/auth.js';
+import { hCaptchaMiddleware } from './utils/hcaptcha.js';
 import { 
   checkRateLimit, 
   recordAttempt, 
@@ -12,8 +13,8 @@ import {
 
 const router = Router();
 
-// Регистрация
-router.post('/auth/register', async (req, res) => {
+// Регистрация С hCaptcha
+router.post('/auth/register', hCaptchaMiddleware, async (req, res) => {
   try {
     const validatedData = validateRegister(req.body);
     
@@ -32,10 +33,14 @@ router.post('/auth/register', async (req, res) => {
       success: true,
       message: 'Регистрация успешна',
       data: { 
-        id: user.id, 
-        email: user.email, 
-        phone: user.phone, 
-        isAdmin: user.is_admin 
+        user: {
+          id: user.id, 
+          email: user.email, 
+          phone: user.phone, 
+          name: user.name,
+          is_admin: user.is_admin 
+        },
+        token
       }
     });
     
@@ -55,8 +60,8 @@ router.post('/auth/register', async (req, res) => {
   }
 });
 
-// Логин
-router.post('/auth/login', async (req, res) => {
+// Логин С hCaptcha
+router.post('/auth/login', hCaptchaMiddleware, async (req, res) => {
   try {
     const validatedData = validateLogin(req.body);
     
@@ -82,14 +87,15 @@ router.post('/auth/login', async (req, res) => {
     const token = generateToken(user);
     setCookieToken(res, token);
     
+    // Убираем пароль из ответа
+    const { password, ...userWithoutPassword } = user;
+    
     res.json({
       success: true,
       message: 'Вход выполнен успешно',
       data: { 
-        id: user.id, 
-        email: user.email, 
-        phone: user.phone, 
-        isAdmin: user.is_admin 
+        user: userWithoutPassword,
+        token
       }
     });
     
@@ -109,12 +115,12 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
-// Получение данных пользователя
+// Получение данных пользователя (БЕЗ hCaptcha)
 router.get('/auth/me', authenticateToken, (req, res) => {
   res.json({ success: true, data: req.user });
 });
 
-// Logout
+// Logout (БЕЗ hCaptcha)
 router.post('/auth/logout', (req, res) => {
   clearCookieToken(res);
   res.json({ 

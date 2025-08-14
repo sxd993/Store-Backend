@@ -1,9 +1,7 @@
-// src/server.js
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { checkConnection } from './database/index.js';
-import { checkHCaptchaConfig } from './auth/utils/hcaptcha.js';
 import { catalogRoutes } from './catalog/index.js';
 import { authRoutes } from './auth/index.js';
 import { cartRoutes } from './cart/index.js';
@@ -29,17 +27,12 @@ app.get('/', (req, res) => {
     success: true,
     message: 'NNV Store API',
     version: '1.0.0',
-    security: {
-      hcaptcha: process.env.HCAPTCHA_SECRET_KEY ? 'enabled' : 'disabled',
-      rate_limiting: 'enabled',
-      jwt_auth: 'enabled'
-    },
     endpoints: {
       // Каталог
       catalog: 'GET /catalog?page=1&per_page=20',
       product: 'GET /catalog/:id',
 
-      // Аутентификация (защищена hCaptcha)
+      // Аутентификация
       register: 'POST /auth/register',
       login: 'POST /auth/login',
       profile: 'GET /auth/me',
@@ -79,13 +72,10 @@ app.use('', adminAccountRoutes);  // Админские роуты (список
 // Проверка здоровья
 app.get('/health', async (req, res) => {
   const dbConnected = await checkConnection();
-  const hcaptchaConfigured = !!process.env.HCAPTCHA_SECRET_KEY;
-  
   res.json({
     success: true,
     status: 'OK',
     database: dbConnected ? 'connected' : 'disconnected',
-    hcaptcha: hcaptchaConfigured ? 'configured' : 'not configured',
     timestamp: new Date().toISOString()
   });
 });
@@ -109,36 +99,20 @@ app.use((err, req, res, next) => {
 
 // Запуск сервера
 async function startServer() {
-  // Проверяем обязательные переменные
   if (!process.env.JWT_SECRET) {
     console.error('❌ JWT_SECRET не установлен в .env');
     process.exit(1);
   }
 
-  // Проверяем подключение к БД
   const dbConnected = await checkConnection();
   if (!dbConnected) {
     console.error('❌ Не удалось подключиться к базе данных');
     process.exit(1);
   }
 
-  // Проверяем конфигурацию hCaptcha
-  try {
-    checkHCaptchaConfig();
-  } catch (error) {
-    console.error('❌', error.message);
-    process.exit(1);
-  }
-
   app.listen(PORT, () => {
     console.log(`🚀 Сервер запущен на порту ${PORT}`);
     console.log(`✅ Готов к работе!`);
-    
-    if (process.env.HCAPTCHA_SECRET_KEY) {
-      console.log(`🛡️ hCaptcha защита активна`);
-    } else {
-      console.log(`⚠️ hCaptcha не настроена (разработка)`);
-    }
   });
 }
 

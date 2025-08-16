@@ -2,7 +2,7 @@ import { pool } from '../../database/index.js';
 import { validateId, validatePagination, validateOrderStatus, ValidationError } from './schema.js';
 
 /**
- * Получение списка заказов с пагинацией
+ * Получение списка всех заказов с пагинацией
  */
 export async function getOrders(page, per_page) {
   try {

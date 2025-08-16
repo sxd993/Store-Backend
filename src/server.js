@@ -1,3 +1,5 @@
+// src/server.js - ОБНОВИТЬ импорты и роуты
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -9,6 +11,7 @@ import { bestOffersRoutes } from './bestOffers/index.js';
 import { searchRoutes } from './search/index.js';
 import { orderRoutes } from './orders/index.js';
 import { adminAccountRoutes } from './personal_account/admin/index.js';
+import { userAccountRoutes } from './personal_account/user/index.js'; // ДОБАВИТЬ
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -21,7 +24,7 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// Главная страница
+// Главная страница - ОБНОВИТЬ endpoints
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -46,16 +49,21 @@ app.get('/', (req, res) => {
       clearCart: 'DELETE /cart/clear',
       syncCart: 'POST /cart/sync',
 
+      // Заказы пользователя
+      userOrders: 'GET /user/orders?page=1&per_page=10',
+      userOrderDetails: 'GET /user/orders/:id',
+
       // Заказы (только создание)
       createOrder: 'POST /orders',
 
       // Админка (список заказов и управление)
       orders: 'GET /orders?page=1&per_page=20',
+      orderDetails: 'GET /orders/:id',
       updateOrderStatus: 'PUT /orders/:id/status',
 
       // Поиск и предложения
-      search: 'GET /search?q=query',
-      bestOffers: 'GET /best-offers'
+      search: 'GET /api/search?q=query',
+      bestOffers: 'GET /api/best-offers'
     }
   });
 });
@@ -68,6 +76,7 @@ app.use('', bestOffersRoutes);
 app.use('', searchRoutes);
 app.use('', orderRoutes);        // Роуты создания заказов
 app.use('', adminAccountRoutes);  // Админские роуты (список заказов, управление)
+app.use('', userAccountRoutes);   // ДОБАВИТЬ - Пользовательские роуты заказов
 
 // Проверка здоровья
 app.get('/health', async (req, res) => {

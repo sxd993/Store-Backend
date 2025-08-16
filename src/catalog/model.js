@@ -4,42 +4,130 @@ import { validateId, validateProduct, validatePagination } from './schema.js';
 const filterCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
 
-export async function getFilterOptions() {
-  const cached = filterCache.get('filters');
+/**
+ * Получение динамических опций для фильтров
+ * Учитывает уже примененные фильтры для обновления доступных опций
+ */
+export async function getFilterOptions(appliedFilters = {}) {
+  // Создаем уникальный ключ кеша на основе примененных фильтров
+  const cacheKey = `filters_${JSON.stringify(appliedFilters)}`;
+  const cached = filterCache.get(cacheKey);
+  
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
   }
 
   try {
+    // Базовое условие - только товары в наличии
+    const baseConditions = ['p.stock_quantity > 0'];
+    const baseParams = [];
+
+    // Добавляем условия для каждого примененного фильтра
+    if (appliedFilters.category) {
+      baseConditions.push('p.category = ?');
+      baseParams.push(appliedFilters.category);
+    }
+    if (appliedFilters.brand) {
+      baseConditions.push('p.brand = ?');
+      baseParams.push(appliedFilters.brand);
+    }
+    if (appliedFilters.model) {
+      baseConditions.push('p.model = ?');
+      baseParams.push(appliedFilters.model);
+    }
+    if (appliedFilters.color) {
+      baseConditions.push('p.color = ?');
+      baseParams.push(appliedFilters.color);
+    }
+    if (appliedFilters.memory) {
+      baseConditions.push('p.memory = ?');
+      baseParams.push(appliedFilters.memory);
+    }
+
+    const baseWhere = baseConditions.join(' AND ');
+
+    // Получаем доступные категории
+    const categoryConditions = baseConditions.filter(c => !c.includes('p.category'));
+    const categoryParams = baseParams.filter((_, i) => !baseConditions[i].includes('p.category'));
+    const categoryWhere = categoryConditions.length > 0 ? `WHERE ${categoryConditions.join(' AND ')}` : 'WHERE p.stock_quantity > 0';
+    
     const [categories] = await pool.query(
-      'SELECT DISTINCT category FROM products WHERE stock_quantity > 0 ORDER BY category'
+      `SELECT DISTINCT p.category, COUNT(*) as count 
+       FROM products p 
+       ${categoryWhere}
+       GROUP BY p.category 
+       ORDER BY p.category`,
+      categoryParams
     );
 
+    // Получаем доступные бренды
+    const brandConditions = baseConditions.filter(c => !c.includes('p.brand'));
+    const brandParams = baseParams.filter((_, i) => !baseConditions[i].includes('p.brand'));
+    const brandWhere = brandConditions.length > 0 ? `WHERE ${brandConditions.join(' AND ')}` : 'WHERE p.stock_quantity > 0';
+    
     const [brands] = await pool.query(
-      'SELECT DISTINCT brand FROM products WHERE stock_quantity > 0 ORDER BY brand'
+      `SELECT DISTINCT p.brand, COUNT(*) as count 
+       FROM products p 
+       ${brandWhere}
+       GROUP BY p.brand 
+       ORDER BY p.brand`,
+      brandParams
     );
 
+    // Получаем доступные модели (с учетом всех фильтров кроме модели)
+    const modelConditions = baseConditions.filter(c => !c.includes('p.model'));
+    const modelParams = baseParams.filter((_, i) => !baseConditions[i].includes('p.model'));
+    const modelWhere = modelConditions.length > 0 ? `WHERE ${modelConditions.join(' AND ')}` : 'WHERE p.stock_quantity > 0';
+    
     const [models] = await pool.query(
-      'SELECT DISTINCT model FROM products WHERE stock_quantity > 0 ORDER BY model'
+      `SELECT DISTINCT p.model, COUNT(*) as count 
+       FROM products p 
+       ${modelWhere}
+       GROUP BY p.model 
+       ORDER BY p.model`,
+      modelParams
     );
 
+    // Получаем доступные цвета (с учетом всех фильтров кроме цвета)
+    const colorConditions = baseConditions.filter(c => !c.includes('p.color'));
+    const colorParams = baseParams.filter((_, i) => !baseConditions[i].includes('p.color'));
+    const colorWhere = colorConditions.length > 0 ? `WHERE ${colorConditions.join(' AND ')}` : 'WHERE p.stock_quantity > 0';
+    
     const [colors] = await pool.query(
-      'SELECT DISTINCT color FROM products WHERE stock_quantity > 0 ORDER BY color'
+      `SELECT DISTINCT p.color, COUNT(*) as count 
+       FROM products p 
+       ${colorWhere}
+       AND p.color IS NOT NULL AND p.color != ''
+       GROUP BY p.color 
+       ORDER BY p.color`,
+      colorParams
     );
 
+    // Получаем доступную память (с учетом всех фильтров кроме памяти)
+    const memoryConditions = baseConditions.filter(c => !c.includes('p.memory'));
+    const memoryParams = baseParams.filter((_, i) => !baseConditions[i].includes('p.memory'));
+    const memoryWhere = memoryConditions.length > 0 ? `WHERE ${memoryConditions.join(' AND ')}` : 'WHERE p.stock_quantity > 0';
+    
     const [memory] = await pool.query(
-      'SELECT DISTINCT memory FROM products WHERE stock_quantity > 0 ORDER BY memory'
+      `SELECT DISTINCT p.memory, COUNT(*) as count 
+       FROM products p 
+       ${memoryWhere}
+       AND p.memory IS NOT NULL AND p.memory != ''
+       GROUP BY p.memory 
+       ORDER BY CAST(p.memory AS UNSIGNED)`,
+      memoryParams
     );
 
     const data = {
-      category: categories.map(r => r.category),
-      brand: brands.map(r => r.brand),
-      model: models.map(r => r.model),
-      colors: colors.map(r => r.color),
-      memory: memory.map(r => r.memory)
+      category: categories.map(r => r.category).filter(Boolean),
+      brand: brands.map(r => r.brand).filter(Boolean),
+      model: models.map(r => r.model).filter(Boolean),
+      colors: colors.map(r => r.color).filter(Boolean),
+      memory: memory.map(r => r.memory).filter(Boolean)
     };
 
-    filterCache.set('filters', { data, timestamp: Date.now() });
+    // Кешируем результат
+    filterCache.set(cacheKey, { data, timestamp: Date.now() });
     return data;
   } catch (error) {
     console.error('Ошибка в getFilterOptions:', error);
@@ -69,13 +157,13 @@ export async function getCatalog(page, per_page, filters = {}) {
       LEFT JOIN product_images pi ON p.id = pi.product_id
       ${whereClause}
       GROUP BY p.id
-      ORDER BY p.id ASC 
+      ORDER BY p.id DESC 
       LIMIT ${safeLimit} OFFSET ${safeOffset}
     `;
 
     const [items] = await pool.query(query, queryParams);
 
-    const countQuery = `SELECT COUNT(*) as total FROM products p ${whereClause.replace('GROUP BY p.id', '')}`;
+    const countQuery = `SELECT COUNT(DISTINCT p.id) as total FROM products p ${whereClause}`;
     const [countRows] = await pool.query(countQuery, queryParams);
 
     const total = countRows.length ? countRows[0].total : 0;
@@ -128,34 +216,39 @@ function parseImagesData(imagesData) {
     });
 }
 
+/**
+ * Построение WHERE условия для SQL запроса
+ */
 function buildWhereClause(filters) {
   const conditions = ['p.stock_quantity > 0'];
   const queryParams = [];
 
-  if (filters.category && filters.category !== 'Все категории') {
-    conditions.push('p.category = ?');
-    queryParams.push(filters.category);
-  }
+  // Обрабатываем каждый фильтр
+  const filterMapping = {
+    category: 'p.category',
+    brand: 'p.brand', 
+    model: 'p.model',
+    color: 'p.color',
+    memory: 'p.memory'
+  };
 
-  if (filters.brand && filters.brand !== 'Все бренды') {
-    conditions.push('p.brand = ?');
-    queryParams.push(filters.brand);
-  }
+  Object.entries(filters).forEach(([key, value]) => {
+    // Пропускаем пустые значения и значения по умолчанию
+    if (!value || 
+        value === 'all' || 
+        value === 'Все категории' || 
+        value === 'Все бренды' ||
+        value === 'Любой' ||
+        value === 'Любая') {
+      return;
+    }
 
-  if (filters.model && filters.model !== 'all') {
-    conditions.push('p.model = ?');
-    queryParams.push(filters.model);
-  }
-
-  if (filters.color && filters.color !== 'all') {
-    conditions.push('p.color = ?');
-    queryParams.push(filters.color);
-  }
-
-  if (filters.memory && filters.memory !== 'all') {
-    conditions.push('p.memory = ?');
-    queryParams.push(filters.memory);
-  }
+    // Добавляем условие в WHERE
+    if (filterMapping[key]) {
+      conditions.push(`${filterMapping[key]} = ?`);
+      queryParams.push(value);
+    }
+  });
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   return { whereClause, queryParams };
@@ -201,6 +294,8 @@ export async function getProductById(id) {
     throw error;
   }
 }
+
+// Функции addProduct и updateProduct остаются без изменений
 export async function addProduct(productData) {
   const connection = await pool.getConnection();
 
@@ -210,7 +305,6 @@ export async function addProduct(productData) {
     const validatedData = validateProduct(productData);
     const { price, stock_quantity, model, color, memory, category, description, brand, images } = validatedData;
 
-    // Вставляем сам товар
     const query = `
       INSERT INTO products (price, stock_quantity, model, color, memory, category, description, brand)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -229,7 +323,6 @@ export async function addProduct(productData) {
 
     const productId = result.insertId;
 
-    // Вставляем изображения, если есть
     if (images && images.length > 0) {
       const imageValues = images.map((url, index) => [
         productId,
@@ -248,7 +341,7 @@ export async function addProduct(productData) {
     }
 
     await connection.commit();
-    filterCache.delete('filters');
+    filterCache.clear();
 
     return {
       id: productId,
@@ -280,7 +373,6 @@ export async function updateProduct(id, productData) {
     const validatedData = validateProduct(productData);
     const { price, stock_quantity, model, color, memory, category, description, brand, images } = validatedData;
 
-    // Обновляем товар
     const query = `
       UPDATE products 
       SET price = ?, stock_quantity = ?, model = ?, color = ?, memory = ?, category = ?, description = ?, brand = ?
@@ -303,7 +395,6 @@ export async function updateProduct(id, productData) {
       throw new Error('Товар не найден или не изменен');
     }
 
-    // Если переданы изображения
     if (images !== undefined) {
       await connection.execute('DELETE FROM product_images WHERE product_id = ?', [validatedId]);
 
@@ -326,7 +417,7 @@ export async function updateProduct(id, productData) {
     }
 
     await connection.commit();
-    filterCache.delete('filters');
+    filterCache.clear();
 
     return {
       id: validatedId,

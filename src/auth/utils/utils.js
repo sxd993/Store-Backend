@@ -1,10 +1,10 @@
 import jwt from 'jsonwebtoken';
 
-// Защита от брутфорса
+// Защита от брутфорса (ИЗМЕНЕНО: по телефону)
 const failedAttempts = new Map();
 
-export function checkRateLimit(email) {
-  const attempts = failedAttempts.get(email) || { count: 0, lastAttempt: 0 };
+export function checkRateLimit(phone) {
+  const attempts = failedAttempts.get(phone) || { count: 0, lastAttempt: 0 };
   const now = Date.now();
   
   if (now - attempts.lastAttempt > 15 * 60 * 1000) {
@@ -14,21 +14,21 @@ export function checkRateLimit(email) {
   return attempts.count < 15;
 }
 
-export function recordAttempt(email, success) {
+export function recordAttempt(phone, success) {
   if (!success) {
-    const attempts = failedAttempts.get(email) || { count: 0, lastAttempt: 0 };
+    const attempts = failedAttempts.get(phone) || { count: 0, lastAttempt: 0 };
     attempts.count++;
     attempts.lastAttempt = Date.now();
-    failedAttempts.set(email, attempts);
+    failedAttempts.set(phone, attempts);
   } else {
-    failedAttempts.delete(email);
+    failedAttempts.delete(phone);
   }
 }
 
-// JWT токены
+// JWT токены (ИЗМЕНЕНО: phone вместо email)
 export function generateToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, isAdmin: user.is_admin },
+    { id: user.id, phone: user.phone, isAdmin: user.is_admin },
     process.env.JWT_SECRET,
     { expiresIn: '2h' }
   );

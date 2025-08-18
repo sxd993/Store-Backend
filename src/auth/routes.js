@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getUserByEmail, createUser, verifyPassword, emailExists } from './model.js';
+import { getUserByPhone, createUser, verifyPassword, phoneExists } from './model.js';
 import { validateRegister, validateLogin, ValidationError } from './schema.js';
 import { authenticateToken } from './middleware/auth.js';
 import { 
@@ -12,15 +12,15 @@ import {
 
 const router = Router();
 
-// Регистрация
+// Регистрация (ИЗМЕНЕНО: по телефону)
 router.post('/auth/register', async (req, res) => {
   try {
     const validatedData = validateRegister(req.body);
     
-    if (await emailExists(validatedData.email)) {
+    if (await phoneExists(validatedData.phone)) {
       return res.status(400).json({
         success: false,
-        message: 'Пользователь с таким email уже существует'
+        message: 'Пользователь с таким номером телефона уже существует'
       });
     }
     
@@ -33,8 +33,8 @@ router.post('/auth/register', async (req, res) => {
       message: 'Регистрация успешна',
       data: { 
         id: user.id, 
-        email: user.email, 
-        phone: user.phone, 
+        phone: user.phone,
+        name: user.name,
         isAdmin: user.is_admin 
       }
     });
@@ -55,29 +55,29 @@ router.post('/auth/register', async (req, res) => {
   }
 });
 
-// Логин
+// Логин (ИЗМЕНЕНО: по телефону)
 router.post('/auth/login', async (req, res) => {
   try {
     const validatedData = validateLogin(req.body);
     
-    if (!checkRateLimit(validatedData.email)) {
+    if (!checkRateLimit(validatedData.phone)) {
       return res.status(429).json({
         success: false,
         message: 'Слишком много попыток. Подождите 15 минут.'
       });
     }
     
-    const user = await getUserByEmail(validatedData.email);
+    const user = await getUserByPhone(validatedData.phone);
     
     if (!user || !(await verifyPassword(user, validatedData.password))) {
-      recordAttempt(validatedData.email, false);
+      recordAttempt(validatedData.phone, false);
       return res.status(401).json({
         success: false,
-        message: 'Неверный email или пароль'
+        message: 'Неверный номер телефона или пароль'
       });
     }
     
-    recordAttempt(validatedData.email, true);
+    recordAttempt(validatedData.phone, true);
     
     const token = generateToken(user);
     setCookieToken(res, token);
@@ -87,8 +87,8 @@ router.post('/auth/login', async (req, res) => {
       message: 'Вход выполнен успешно',
       data: { 
         id: user.id, 
-        email: user.email, 
-        phone: user.phone, 
+        phone: user.phone,
+        name: user.name,
         isAdmin: user.is_admin 
       }
     });
@@ -109,12 +109,12 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
-// Получение данных пользователя
+// Получение данных пользователя (БЕЗ ИЗМЕНЕНИЙ)
 router.get('/auth/me', authenticateToken, (req, res) => {
   res.json({ success: true, data: req.user });
 });
 
-// Logout
+// Logout (БЕЗ ИЗМЕНЕНИЙ)
 router.post('/auth/logout', (req, res) => {
   clearCookieToken(res);
   res.json({ 

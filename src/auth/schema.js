@@ -6,24 +6,22 @@ export class ValidationError extends Error {
 }
 
 // Только критичные проверки для защиты от атак
-function validateEmail(email) {
-  if (!email || typeof email !== 'string') {
-    throw new ValidationError('Email обязателен');
+function validatePhone(phone, required = false) {
+  if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
+    if (required) {
+      throw new ValidationError('Номер телефона обязателен');
+    }
+    return null;
   }
   
-  const trimmed = email.trim();
+  const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
   
-  // Защита от XSS и injection
-  if (trimmed.length > 254 || trimmed.includes('<') || trimmed.includes('>')) {
-    throw new ValidationError('Неверный формат email');
+  // Защита от injection и слишком длинных значений
+  if (cleaned.length < 8 || cleaned.length > 20 || !/^\+?\d+$/.test(cleaned)) {
+    throw new ValidationError('Неверный формат телефона');
   }
   
-  // Минимальная проверка формата
-  if (!trimmed.includes('@') || trimmed.length < 5) {
-    throw new ValidationError('Неверный формат email');
-  }
-  
-  return trimmed.toLowerCase();
+  return cleaned;
 }
 
 function validateName(name) {
@@ -59,19 +57,22 @@ function validatePassword(password) {
   return password;
 }
 
-function validatePhone(phone, required = false) {
-  if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
-    if (required) {
-      throw new ValidationError('Номер телефона обязателен');
-    }
-    return null;
+// Нормализация телефона для входа
+function normalizePhone(phone) {
+  if (!phone) return '';
+  
+  // Убираем все кроме цифр и +
+  const cleaned = phone.replace(/[^\d\+]/g, '');
+  
+  // Приводим к единому формату
+  if (cleaned.startsWith('8') && cleaned.length === 11) {
+    return '+7' + cleaned.slice(1);
   }
-  
-  const cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
-  
-  // Защита от injection и слишком длинных значений
-  if (cleaned.length < 8 || cleaned.length > 20 || !/^\+?\d+$/.test(cleaned)) {
-    throw new ValidationError('Неверный формат телефона');
+  if (cleaned.startsWith('7') && cleaned.length === 11) {
+    return '+' + cleaned;
+  }
+  if (cleaned.startsWith('+7') && cleaned.length === 12) {
+    return cleaned;
   }
   
   return cleaned;
@@ -83,13 +84,12 @@ export function validateRegister(userData) {
     throw new ValidationError('Данные пользователя обязательны');
   }
 
-  const { email, password, phone, name } = userData;
+  const { phone, password, name } = userData;
   
   return {
-    email: validateEmail(email),
+    phone: validatePhone(phone, true),
     name: validateName(name),
-    password: validatePassword(password),
-    phone: validatePhone(phone, true)
+    password: validatePassword(password)
   };
 }
 
@@ -98,10 +98,10 @@ export function validateLogin(userData) {
     throw new ValidationError('Данные для входа обязательны');
   }
 
-  const { email, password } = userData;
+  const { phone, password } = userData;
   
-  if (!email || typeof email !== 'string') {
-    throw new ValidationError('Email обязателен');
+  if (!phone || typeof phone !== 'string') {
+    throw new ValidationError('Номер телефона обязателен');
   }
   
   if (!password || typeof password !== 'string') {
@@ -109,7 +109,7 @@ export function validateLogin(userData) {
   }
   
   return {
-    email: email.trim().toLowerCase(),
+    phone: normalizePhone(phone),
     password: password
   };
 }

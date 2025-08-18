@@ -110,7 +110,6 @@ export async function getOrderDetails(orderId) {
         o.created_at,
         o.updated_at,
         u.name as user_name,
-        u.email as user_email,
         u.phone as user_phone
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -155,7 +154,6 @@ export async function getOrderDetails(orderId) {
       // Информация о пользователе
       user: {
         name: order.user_name,
-        email: order.user_email,
         phone: order.user_phone
       },
       
@@ -209,7 +207,6 @@ export async function getAllOrdersWithUsers(page, per_page) {
         o.created_at,
         o.updated_at,
         u.name as user_name,
-        u.email as user_email,
         u.phone as user_phone,
         COUNT(oi.id) as total_items,
         SUM(oi.quantity) as total_quantity
@@ -217,7 +214,7 @@ export async function getAllOrdersWithUsers(page, per_page) {
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       GROUP BY o.id, o.user_id, o.total_price, o.status, o.created_at, o.updated_at,
-               u.name, u.email, u.phone
+               u.name, u.phone
       ORDER BY o.created_at DESC 
       LIMIT ? OFFSET ?
     `, [safeLimit, safeOffset]);
@@ -238,7 +235,6 @@ export async function getAllOrdersWithUsers(page, per_page) {
         updated_at: order.updated_at,
         user: {
           name: order.user_name,
-          email: order.user_email,
           phone: order.user_phone
         },
         stats: {
@@ -278,7 +274,6 @@ export async function getAnyOrderDetails(orderId) {
         o.created_at,
         o.updated_at,
         u.name as user_name,
-        u.email as user_email,
         u.phone as user_phone
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -322,8 +317,6 @@ export async function getAnyOrderDetails(orderId) {
       
       // Информация о пользователе
       user: {
-        name: order.user_name,
-        email: order.user_email,
         phone: order.user_phone
       },
       

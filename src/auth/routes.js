@@ -12,7 +12,7 @@ import {
 
 const router = Router();
 
-// Регистрация (ИЗМЕНЕНО: по телефону)
+// Регистрация
 router.post('/auth/register', async (req, res) => {
   try {
     const validatedData = validateRegister(req.body);
@@ -55,7 +55,7 @@ router.post('/auth/register', async (req, res) => {
   }
 });
 
-// Логин (ИЗМЕНЕНО: по телефону)
+// Логин
 router.post('/auth/login', async (req, res) => {
   try {
     const validatedData = validateLogin(req.body);

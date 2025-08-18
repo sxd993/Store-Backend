@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-// Защита от брутфорса (ИЗМЕНЕНО: по телефону)
+// Защита от брутфорса
 const failedAttempts = new Map();
 
 export function checkRateLimit(phone) {
@@ -25,7 +25,7 @@ export function recordAttempt(phone, success) {
   }
 }
 
-// JWT токены (ИЗМЕНЕНО: phone вместо email)
+// JWT токены
 export function generateToken(user) {
   return jwt.sign(
     { id: user.id, phone: user.phone, isAdmin: user.is_admin },

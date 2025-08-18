@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 const userCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 минут
 
-// Для логина - с паролем (ИЗМЕНЕНО: по телефону)
+// Для логина - с паролем
 export async function getUserByPhone(phone) {
   const [rows] = await pool.execute(
     'SELECT id, phone, password, name, is_admin FROM users WHERE phone = ?',
@@ -14,7 +14,7 @@ export async function getUserByPhone(phone) {
   return rows[0] || null;
 }
 
-// Для проверки токена - БЕЗ пароля + кеширование (ИЗМЕНЕНО: убрали email)
+// Для проверки токена
 export async function getUserById(id) {
   const cacheKey = `user_${id}`;
   const cached = userCache.get(cacheKey);
@@ -31,7 +31,7 @@ export async function getUserById(id) {
   
   const user = rows[0] || null;
   
-  // Кешируем результат (даже null)
+  // Кешируем результат
   if (user) {
     userCache.set(cacheKey, {
       user,
@@ -42,7 +42,7 @@ export async function getUserById(id) {
   return user;
 }
 
-// ИЗМЕНЕНО: создание пользователя без email
+// Cоздание пользователя
 export async function createUser(userData) {
   const { phone, password, name } = userData;
   const hashedPassword = await bcrypt.hash(password, 12);

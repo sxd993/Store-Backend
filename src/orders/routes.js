@@ -1,23 +1,15 @@
 import { Router } from 'express';
-import {  createOrder } from './model.js';
-import { validateId,  handleError } from './schema.js';
+import { createOrder } from './model.js';
+import { validateId, handleError } from './schema.js';
+import { authenticateToken } from '../auth/middleware/auth.js';
 
 const router = Router();
 
 
 // POST /orders - создание заказа из корзины
-router.post('/orders', async (req, res) => {
+router.post('/orders', authenticateToken, async (req, res) => {
   try {
-    const { user_id } = req.body;
-
-    if (!user_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'user_id обязателен'
-      });
-    }
-
-    const validatedUserId = validateId(user_id);
+    const validatedUserId = validateId(req.user.id);
     const result = await createOrder(validatedUserId);
 
     res.status(201).json({ success: true, data: result });
